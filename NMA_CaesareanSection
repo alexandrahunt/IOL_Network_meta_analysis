@@ -1,0 +1,576 @@
+library(multinma)
+library(dplyr)
+#Risk of bias package
+install.packages("robvis")
+library(robvis)
+library(readxl)
+library(dplyr)
+library(stringr)
+library(dbplyr)
+library(ggplot2)
+library(scales)
+library(stringr)
+library(tidyr)
+library(writexl)
+library(patchwork)
+
+#look up table###
+trt_lookup <- data.frame(
+  Code = c(
+    "AP", "ATO", "ADO", "A", "CO", "CM", "CEM", "DBCC", "HI", "H",
+    "EASI", "EAMPGE2", "FCAO", "FCPGE2", "FCVM", "FCVN", "FCOM", "FCD",
+    "FCSM", "FC", "HBBVM", "HT", "CPGE2G", "OTA", "OVPGE2", "O", "LAM",
+    "LAMD", "MS", "MSVM", "MIF", "NI", "OM50", "OM50_plus", "OM50O",
+    "OP", "P", "SLM", "SBM", "BM", "MN", "TOM", "TN", "VM50", "VM50_plus",
+    "VMG", "VN", "TNCPGE2G", "VPGE2G", "VPGF2G", "VPGE2P", "VPGE2PSR",
+    "VPGE2T", "VPGE2PSRVW", "VMOE", "VMAG", "IVPO", "OPO", "US", "NS", "ICM"
+  ),
+  
+  Intervention = c(
+    "Acupuncture", "Amniotomy followed by IV oxytocin", "Amniotomy followed by delayed oxytocin",
+    "Amniotomy", "Castor oil", "Cervical misoprostol", "Cervical massage", 
+    "Double balloon or Cook's catheter", "Hyaluronidase injection", "Homeopathy",
+    
+    "Extra amniotic saline infusion", "Extra-amniotic PGF", "Foley catheter and oxytocin simultaneously",
+    "Foley catheter and PGE2 gel", "Foley catheter and vaginal misoprostol", 
+    "Foley catheter and vaginal nitrate", "Foley catheter and oral misoprostol",
+    "Foley catheter and controlled release dinoprostone", "Foley catheter and sublingual misoprostol",
+    "Foley catheter", "Hyoscine butyl bromide and vaginal misoprostol", "Hyoscine tablet",
+    "Intracervical PGE2 gel", "IV Oxytocin then amniotomy", "IV oxytocin and vaginal PGE2",
+    "IV Oxytocin", "Laminaria (including dilapan)", "Laminaria and dinoprostone",
+    "Membrane sweeping", "Membrane sweeping and vaginal misoprostol", "Mifepristone",
+    "No intervention", "Oral misoprostol (<50 micrograms)", "Oral misoprostol (≥50 micrograms)",
+    "Oral misoprostol (<50 micrograms and oxytocin)", "Oral prostaglandins", "Placebo",
+    "Sublingual misoprostol", "Sublingual/buccal misoprostol", "Buccal misoprostol",
+    "Misoprostol and nitrates", "Titrated low dose oral misoprostol solution", "Transdermal nitrates",
+    "Vaginal misoprostol (<50 micrograms)", "Vaginal misoprostol (≥50 micrograms)",
+    "Vaginal misoprostol gel", "Vaginal nitrates", "Transdermal nitrates and intracervical PGE2 gel",
+    "Vaginal PGE2 gel", "Vaginal PGF2 gel", "Vaginal PGE2 pessary normal release",
+    "Vaginal PGE2 pessary slow release", "Vaginal PGE2 tablet",
+    "Vaginal PGE2 pessary slow release and vaginal washing", "Vaginal misoprostol and oestradiol",
+    "Vaginal magnesium", "IV propranolol and oxytocin", "Oral propranolol and oxytocin",
+    "Uterine stimulation", "Nipple stimulation",  "Intracervical misopstrol"
+  ),
+  
+  Grouped_Intervention = c(
+    "Acupuncture", "Amniotomy followed by oxytocin", "Amniotomy and delayed oxytocin",
+    "Amniotomy", "Homeopathy", "Cervical misoprostol", "Homeopathy",
+    "Double balloon or Cook's catheter", "Hyaluronidase", "Homeopathy",
+    
+    "Extra amniotic saline infusion", "Extra amniotic prostaglandin", 
+    "Foley catheter and oxytocin simultaneously", "Foley catheter and PGE2 gel", 
+    "Foley catheter and vaginal misoprostol", "Foley catheter and vaginal nitric oxide donors",
+    "Foley catheter and oral misoprostol", "Foley catheter and controlled release dinoprostone",
+    "Foley catheter and sublingual misoprostol", "Foley catheter",
+    "Hyoscine butyl bromide and vaginal misoprostol", "Hyoscine tablet",
+    "Intracervical PGE2 gel", "Oxytocin then amniotomy", "Vaginal PGE2 and oxytocin",
+    "Oxytocin", "Laminaria and Dilapan", "Laminaria and PGE2",
+    "Membrane sweeping", "Membrane sweeping and vaginal misoprostol", "Mifepristone",
+    "No intervention", "Oral misoprostol (<50 micrograms)", "Oral misoprostol (≥50 micrograms)",
+    "Oral misoprostol and oxytocin", "Oral prostaglandins", "Placebo",
+    "Sublingual misoprostol", "Sublingual misoprostol", "Buccal misoprostol",
+    "Misoprostol and nitrates", "<50 micrograms oral misoprostol", "Transdermal nitric oxide donors",
+    "Vaginal misoprostol (<50 micrograms)", "Vaginal misoprostol (≥50 micrograms) ",
+    "Vaginal misoprostol gel", "Vaginal nitric oxide donors", "Transdermal nitrates and intracervical PGE2 gel",
+    "Vaginal PGE2 gel", "Vaginal PGF2", "Vaginal PGE2 pessary normal release",
+    "Slow release PGE2 pessary", "Vaginal PGE2 tablet",
+    "Vaginal PGE2 pessary slow release and vaginal washing", "Vaginal misoprostol and oestradiol",
+    "Vaginal magnesium", "IV propranolol and oxytocin", "Oral propranolol and oxytocin",
+    "Homeopathy", "Homeopathy", "Intracervical misopstrol"
+  ),
+  
+  stringsAsFactors = FALSE
+)
+
+setwd("")
+RoB_data <- read_excel("Baseline characteristics.xlsx", sheet = "Risk of Bias ")
+
+#Identify low risk studies #####
+lowROB_studies <- RoB_data %>% 
+  filter(`Overall` == "Low risk of bias")
+lowROB_studies <- lowROB_studies %>%
+  mutate(study_clean = str_to_lower(`Name and year`) %>%
+           str_replace_all("[^a-z0-9]", ""))
+
+#Read file #####
+file_path <- "General outcomes.xlsx"
+sheets <- excel_sheets(file_path);sheets
+
+data_raw <- read_excel(file_path, sheet = "Caesarean section") #Change sheet to assign outcome 
+
+data_raw <- data_raw %>%
+  mutate(study_clean = str_to_lower(Study) %>%
+           str_replace_all("[^a-z0-9]", ""))
+
+#match with low risk - flag low risk studies to later filter
+lowROB_studies_flag <- lowROB_studies %>%
+  mutate(lowROB = 1)
+
+data_raw_low <- data_raw %>%
+  left_join(lowROB_studies_flag %>% select(study_clean, lowROB),
+            by = "study_clean") %>%
+  mutate(lowROB = ifelse(is.na(lowROB), 0, 1))
+
+data_raw_low <- data_raw_low %>%
+  filter(lowROB == 1)
+
+#data_raw_low <- data_raw
+class(data_raw_low)
+str(data_raw)
+data_raw_low$Study <- as.factor(data_raw_low$Study)
+data_raw_low$`Outcome of interest` <- as.factor(data_raw_low$`Outcome of interest`)
+data_raw_low$`Intervention in Arm 1` <- as.factor(data_raw_low$`Intervention in Arm 1`)
+data_raw_low$`Intervention in Arm 2` <- as.factor(data_raw_low$`Intervention in Arm 2`)
+data_raw_low$`Intervention in Arm 3` <- as.factor(data_raw_low$`Intervention in Arm 3`)
+data_raw_low$`Total number in arm 1` <- as.numeric(data_raw_low$`Total number in arm 1`)
+data_raw_low$`Total number in arm 2` <- as.numeric(data_raw_low$`Total number in arm 2`)
+data_raw_low$`Total number in arm 3` <- as.numeric(data_raw_low$`Total number in arm 3`)
+
+#Clean #####
+
+##--- Convert from wide (two-arm) to long (one arm per row) --- ####
+data_long_low <- data_raw_low %>%
+  select(Study,
+         Outcome = `Outcome of interest`,
+         treat1 = `Intervention in Arm 1`,
+         treat2 = `Intervention in Arm 2`,
+         treat3 = `Intervention in Arm 3`,
+         e1 = `Events in arm 1`,
+         n1 = `Total number in arm 1`,
+         e2 = `Events in arm 2`,
+         n2 = `Total number in arm 2`,
+         e3 = `Events in arm 3`,
+         n3 = `Total number in arm 3`) %>%
+  pivot_longer(
+    cols = c(treat1, treat2, treat3, e1, e2, e3, n1, n2, n3),
+    names_to = c(".value", "arm"),
+    names_pattern = "([A-Za-z]+)([123])"
+  ) %>%
+  rename(treatment = treat, responders = e, sampleSize = n) %>%
+  filter(!is.na(treatment)) %>%   # drop missing arms %>% 
+  select(study = Study, treatment, responders, sampleSize)
+
+head(data_long_low)
+#clean treatment names. (no "" or +)
+data_long_low <- data_long_low %>%
+  mutate(
+    treatment = treatment |> 
+      str_replace_all("[\\u00A0\\t\\r\\n]", " ") |>  # replace non-breaking spaces, tabs, etc. with normal space
+      str_trim() |>                                 # trim from both ends
+      str_replace_all(fixed("+"), "_plus") |>       # replace plus with _plus
+      str_replace_all("[^A-Za-z0-9_]", "_") |>      # replace remaining invalid characters
+      str_replace_all("_+", "_") |>                 # collapse multiple underscores
+      str_remove("^_") |>                           # remove leading underscore
+      str_remove("_$")                              # remove trailing underscore
+  )
+#######
+
+table(data_long_low$treatment)
+#save plot and add names####
+label_mapping <- setNames(
+  trt_lookup$Grouped_Intervention,
+  trt_lookup$Code
+)
+data_long_low$treatment <- label_mapping[as.character(data_long_low$treatment)]
+
+#Netgraph #####
+# set up agd arm data 
+test_low <- set_agd_arm(data_long_low, 
+                        study = study, trt = treatment, 
+                        r = responders, 
+                        n = sampleSize, trt_ref = "Vaginal misoprostol (<50 micrograms)");test_low
+
+plot(test_low, weight_nodes = TRUE, weight_edges = TRUE, nudge = 0.15)   #, show_trt_class = TRUE 
+sum(test_low$agd_arm$sampleSize, na.rm = TRUE) #number of studies, women 
+
+class(test_low)
+
+#check for connection - if disconnected can see which and extract connected network for analyses  
+summary(test_low)
+is_network_connected(test_low)
+
+
+
+# Extract the igraph representation to see disconnections 
+g <- igraph::as.igraph(test_low)
+comp <- igraph::components(g)
+# Number of disconnected subnetworks
+comp$no
+# Identify the largest connected component
+largest_comp <- which.max(comp$csize)
+
+# Get treatments in the largest connected component
+keep_trts <- igraph::V(g)$name[comp$membership == largest_comp]
+
+# Filter the original dataset to keep only studies with treatments in that component
+nma_data_connected <- data_long_low %>%
+  filter(treatment %in% keep_trts)
+
+#nma 
+nma_data <- set_agd_arm(nma_data_connected, 
+                        study = study, trt = treatment, 
+                        r = responders, 
+                        n = sampleSize, trt_ref = "Vaginal misoprostol (<50 micrograms)");nma_data
+
+plot(nma_data, weight_nodes = TRUE, weight_edges = TRUE, nudge = 0.15)
+sum(nma_data$agd_arm$sampleSize, na.rm = TRUE) #number of studies, women 
+table(nma_data$agd_arm$.trt)
+
+#plot(nma_data, weight_nodes = TRUE, weight_edges = TRUE, nudge = 0.15)
+save_path <- file.path("")
+png(save_path, width = 2500, height = 1500, res = 100)
+print(plot(nma_data, 
+     weight_nodes = TRUE, 
+     weight_edges = TRUE, 
+     nudge = 0.10))
+dev.off()
+
+#random effects nma model - uses the connected components (consistency model) (Set priors - informative)
+icl_fit_re <- nma(nma_data, 
+                  trt_effects = "random",
+                  prior_intercept = normal(0,10),
+                  prior_trt = normal(scale = 5),
+                  prior_het = half_normal(scale = 1),
+                  chains = 2,      # number of Markov chains
+                  iter = 10000,     # total iterations per chain
+                  warmup = 1000,   # number of warmup (burn-in) iterations
+                  thin = 5,        # thinning interval
+                  control = list(max_treedepth = 15, adapt_delta = 0.95)
+)
+
+
+#estimates against a chosen reference
+re_treat <- relative_effects(icl_fit_re, all_contrasts = FALSE) 
+
+##################
+LOR_array <- as.array(re_treat)
+OR_array <- exp(LOR_array)
+re_treat_OR <- summary(OR_array)
+
+# Use the OR summary as your plotting data frame
+re_sum_OR <- as.data.frame(re_treat_OR);re_sum_OR
+write_xlsx(re_sum_OR, path = file.path("")
+)
+
+#strip the D[] before treatment parametes
+re_sum_OR$Treatment <- gsub("^d\\[|\\]$", "", re_sum_OR$parameter)
+
+#Add look up table for acronyms of interventions 
+#re_sum_OR <- merge(re_sum_OR, trt_lookup, by.x = "Treatment", by.y = "Code", all.x = TRUE)
+
+#Order 
+re_sum_OR <- re_sum_OR[order(re_sum_OR$`50%`),  ]
+rownames(re_sum_OR) <- NULL
+intervention_order <- unique(re_sum_OR$Treatment)
+re_sum_OR$Intervention <- factor(re_sum_OR$Treatment, levels = rev(intervention_order))
+
+# Check nothing failed to match (should return 0 rows)
+re_sum_OR[is.na(re_sum_OR$Treatment), ]
+
+# Text labels now show OR (95% CrI) instead of log-OR
+re_sum_OR$label <- sprintf("%.2f (%.2f, %.2f)",
+                           re_sum_OR$`50%`,
+                           re_sum_OR$`2.5%`,
+                           re_sum_OR$`97.5%`);re_sum_OR
+
+p2 <- ggplot(re_sum_OR, aes(y = Intervention)) +
+  geom_text(aes(x = 0, label = label), hjust = 0, size = 3.2) +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_void() +
+  theme(
+    plot.margin = margin(0, 40, 5.5, 5.5),
+    plot.title = element_text(hjust = 0.05, size = 10, margin = margin(t = -2, b = 2))
+  )+
+  labs(title = "OR (95% CI)"); p2
+
+# Forest plot on the odds ratio scale
+p1 <- ggplot(re_sum_OR, aes(x = `50%`, y = Intervention)) +
+  geom_point(size = 2) +
+  geom_errorbarh(
+    aes(xmin = `2.5%`, xmax = `97.5%`),
+    height = 0.2
+  ) +
+  geom_vline(
+    xintercept = 1,          # null effect on OR scale is 1, not 0
+    linetype = "dashed",
+    colour = "grey40"
+  ) +
+  scale_x_log10(
+    breaks = c(0.00001, 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 5000, 20000),
+    labels = c("0.00001","0.0001","0.001", "0.01", "0.1", "1", "10", "100", "1000", "5000", "20000"),
+    oob = scales::oob_squish
+  ) +          # log scale keeps CIs visually symmetric for ORs
+  labs(
+    x = "Odds ratio",
+    y = "Intervention",
+    title = "Network meta-analysis: Caesarean Section:\n Treatment effects vs Vaginal misoprostol (<50 micrograms)",
+    subtitle = "Points show posterior median OR; lines show 95% credible intervals"
+  ) +
+  theme_bw(base_size = 12)+
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  ); p1
+
+#patchwork
+#install.packages("patchwork")
+#library(patchwork)
+combined_plot <- p1 + p2 + patchwork::plot_layout(widths = c(2, 1)); combined_plot
+ggsave(
+  filename = file.path(""),
+  plot = combined_plot,
+  width = 25,      # inches - adjust to taste
+  height = 10,      # inches - adjust to taste
+  dpi = 300        # good resolution 
+)
+
+#Rankograms####
+#Rankograms####
+#Rankograms
+# Mean ranks and other summary statistics
+icl_ranks_re <- posterior_ranks(icl_fit_re, lower_better = TRUE) #default is true but this need to be set per outcome
+rank <- icl_ranks_re$summary
+
+# Probability of occupying each rank
+icl_probs_re <- posterior_rank_probs(icl_fit_re)
+
+# Plot the rankogram
+p_rank <- plot(icl_probs_re);p_rank
+
+# Save the rankogram
+rankogram_path <- file.path("")
+ggsave(rankogram_path, plot = p_rank, width = 12, height = 10, dpi = 100)
+
+# Cumulative probabilities of occupying each rank
+icl_cum_probs_re <- posterior_rank_probs(icl_fit_re, cumulative = TRUE, lower_better = TRUE)
+
+
+#All risk of bias 
+cat("Starting all risk of bias sensitivity analysis")
+RoB_data <- read_excel("Baseline characteristics.xlsx", sheet = "Risk of Bias ")
+
+
+#Read file #####
+file_path <- "General outcomes.xlsx"
+sheets <- excel_sheets(file_path);sheets
+
+data_raw <- read_excel(file_path, sheet = "Caesarean section") #change sheet name according to outcome 
+
+data_raw <- data_raw %>%
+  mutate(study_clean = str_to_lower(Study) %>%
+           str_replace_all("[^a-z0-9]", ""))
+
+#ease of renaming without the low risk filtering - assign raw data to this "all risk dataset" 
+data_raw_low <- data_raw
+class(data_raw_low)
+str(data_raw)
+data_raw_low$Study <- as.factor(data_raw_low$Study)
+data_raw_low$`Outcome of interest` <- as.factor(data_raw_low$`Outcome of interest`)
+data_raw_low$`Intervention in Arm 1` <- as.factor(data_raw_low$`Intervention in Arm 1`)
+data_raw_low$`Intervention in Arm 2` <- as.factor(data_raw_low$`Intervention in Arm 2`)
+data_raw_low$`Intervention in Arm 3` <- as.factor(data_raw_low$`Intervention in Arm 3`)
+data_raw_low$`Total number in arm 1` <- as.numeric(data_raw_low$`Total number in arm 1`)
+data_raw_low$`Total number in arm 2` <- as.numeric(data_raw_low$`Total number in arm 2`)
+data_raw_low$`Total number in arm 3` <- as.numeric(data_raw_low$`Total number in arm 3`)
+
+#Clean #####
+
+##--- Convert from wide (two-arm) to long (one arm per row) --- ####
+data_long_low <- data_raw_low %>%
+  select(Study,
+         Outcome = `Outcome of interest`,
+         treat1 = `Intervention in Arm 1`,
+         treat2 = `Intervention in Arm 2`,
+         treat3 = `Intervention in Arm 3`,
+         e1 = `Events in arm 1`,
+         n1 = `Total number in arm 1`,
+         e2 = `Events in arm 2`,
+         n2 = `Total number in arm 2`,
+         e3 = `Events in arm 3`,
+         n3 = `Total number in arm 3`) %>%
+  pivot_longer(
+    cols = c(treat1, treat2, treat3, e1, e2, e3, n1, n2, n3),
+    names_to = c(".value", "arm"),
+    names_pattern = "([A-Za-z]+)([123])"
+  ) %>%
+  rename(treatment = treat, responders = e, sampleSize = n) %>%
+  filter(!is.na(treatment)) %>%   # drop missing arms %>% 
+  select(study = Study, treatment, responders, sampleSize)
+
+head(data_long_low)
+#clean treatment names. (no "" or +)
+data_long_low <- data_long_low %>%
+  mutate(
+    treatment = treatment |> 
+      str_replace_all("[\\u00A0\\t\\r\\n]", " ") |>  # replace non-breaking spaces, tabs, etc. with normal space
+      str_trim() |>                                 # trim from both ends
+      str_replace_all(fixed("+"), "_plus") |>       # replace plus with _plus
+      str_replace_all("[^A-Za-z0-9_]", "_") |>      # replace remaining invalid characters
+      str_replace_all("_+", "_") |>                 # collapse multiple underscores
+      str_remove("^_") |>                           # remove leading underscore
+      str_remove("_$")                              # remove trailing underscore
+  )
+#######
+
+table(data_long_low$treatment)
+#save plot and add names####
+label_mapping <- setNames(
+  trt_lookup$Grouped_Intervention,
+  trt_lookup$Code
+)
+data_long_low$treatment <- label_mapping[as.character(data_long_low$treatment)]
+
+#Netgraph #####
+# set up agd arm data 
+test_low <- set_agd_arm(data_long_low, 
+                        study = study, trt = treatment, 
+                        r = responders, 
+                        n = sampleSize, trt_ref = "Vaginal misoprostol (<50 micrograms)");test_low
+
+plot(test_low, weight_nodes = TRUE, weight_edges = TRUE, nudge = 0.15)   #, show_trt_class = TRUE 
+sum(test_low$agd_arm$sampleSize, na.rm = TRUE) #number of studies, women 
+
+class(test_low)
+
+#check for connection - if disconnected can see which  
+summary(test_low)
+is_network_connected(test_low)
+
+plot(test_low, weight_nodes = TRUE, weight_edges = TRUE, nudge = 0.15)
+save_path <- file.path("")
+png(save_path, width = 2500, height = 1500, res = 100)
+print(plot(test_low, 
+     weight_nodes = TRUE, 
+     weight_edges = TRUE, 
+     nudge = 0.10))
+dev.off()
+
+#distinguish between random effect model and fixed effects 
+#random effects nma model - uses the connected components (consistency model) (Set priors - informative)
+icl_fit_re <- nma(test_low, 
+                  trt_effects = "random",
+                  prior_intercept = normal(0,10),
+                  prior_trt = normal(scale = 5),
+                  prior_het = half_normal(scale = 1),
+                  chains = 2,      # number of Markov chains
+                  iter = 10000,     # total iterations per chain
+                  warmup = 1000,   # number of warmup (burn-in) iterations
+                  thin = 5,        # thinning interval
+                  control = list(max_treedepth = 15, adapt_delta = 0.95)
+)
+#fit a fixed effect nma model (Set priors - informative)
+icl_fit_fe <- nma(nma_data, 
+                  trt_effects = "fixed",
+                  prior_intercept = normal(scale = 10),
+                  prior_trt = normal(scale = 5),
+                  prior_het = half_normal(scale = 1),
+                  chains = 2,      # number of Markov chains
+                  iter = 10000,     # total iterations per chain
+                  warmup = 1000,   # number of warmup (burn-in) iterations
+                  thin = 5,        # thinning interval
+                  control = list(max_treedepth = 15, adapt_delta = 0.95))
+
+
+
+#estimates against a chosen reference
+re_treat <- relative_effects(icl_fit_re, all_contrasts = FALSE) 
+
+##################
+LOR_array <- as.array(re_treat)
+OR_array <- exp(LOR_array)
+re_treat_OR <- summary(OR_array)
+
+# Use the OR summary as your plotting data frame
+re_sum_OR <- as.data.frame(re_treat_OR);re_sum_OR
+write_xlsx(re_sum_OR, path = file.path("")
+)
+
+#strip the D[] before treatment parametes
+re_sum_OR$Treatment <- gsub("^d\\[|\\]$", "", re_sum_OR$parameter)
+
+#Add look up table for acronyms of interventions 
+
+#re_sum_OR <- merge(re_sum_OR, trt_lookup, by.x = "Treatment", by.y = "Code", all.x = TRUE)
+
+#Order 
+re_sum_OR <- re_sum_OR[order(re_sum_OR$`50%`),  ]
+rownames(re_sum_OR) <- NULL
+intervention_order <- unique(re_sum_OR$Treatment)
+re_sum_OR$Intervention <- factor(re_sum_OR$Treatment, levels = rev(intervention_order))
+
+# Check nothing failed to match (should return 0 rows)
+re_sum_OR[is.na(re_sum_OR$Intervention), ]
+
+# Text labels now show OR (95% CrI) instead of log-OR
+re_sum_OR$label <- sprintf("%.2f (%.2f, %.2f)",
+                           re_sum_OR$`50%`,
+                           re_sum_OR$`2.5%`,
+                           re_sum_OR$`97.5%`);re_sum_OR
+
+p2 <- ggplot(re_sum_OR, aes(y = Intervention)) +
+  geom_text(aes(x = 0, label = label), hjust = 0, size = 3.2) +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_void() +
+  theme(
+    plot.margin = margin(0, 40, 5.5, 5.5),
+    plot.title = element_text(hjust = 0.05, size = 10, margin = margin(t = -2, b = 2))
+  )+
+  labs(title = "OR (95% CI)"); p2
+
+# Forest plot on the odds ratio scale
+p1 <- ggplot(re_sum_OR, aes(x = `50%`, y = Intervention)) +
+  geom_point(size = 2) +
+  geom_errorbarh(
+    aes(xmin = `2.5%`, xmax = `97.5%`),
+    height = 0.2
+  ) +
+  geom_vline(
+    xintercept = 1,          # null effect on OR scale is 1, not 0
+    linetype = "dashed",
+    colour = "grey40"
+  ) +
+  scale_x_log10(
+    breaks = c(0.00001, 0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 5000, 20000),
+    labels = c("0.00001","0.0001","0.001", "0.01", "0.1", "1", "10", "100", "1000", "5000", "20000"),
+    oob = scales::oob_squish
+  ) +          # log scale keeps CIs visually symmetric for ORs
+  labs(
+    x = "Odds ratio",
+    y = "Intervention",
+    title = "Network meta-analysis: Caesarean Section:\n Treatment effects vs Vaginal misoprostol (<50 micrograms)",
+    subtitle = "Points show posterior median OR; lines show 95% credible intervals"
+  ) +
+  theme_bw(base_size = 12)+
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  ); p1
+
+#patchwork
+#install.packages("patchwork")
+#library(patchwork)
+combined_plot <- p1 + p2 + patchwork::plot_layout(widths = c(2, 1)); combined_plot
+ggsave(
+  filename = file.path(""),
+  plot = combined_plot,
+  width = 25,      # inches - adjust to taste
+  height = 10,      # inches - adjust to taste
+  dpi = 300        # good resolution 
+)
+
+#Rankogram ####
+#Rankograms ####
+# Mean ranks and other summary statistics
+icl_ranks_re <- posterior_ranks(icl_fit_re, lower_better = TRUE) #default is true but this need to be set per outcome
+rank <- icl_ranks_re$summary
+
+# Probability of occupying each rank
+icl_probs_re <- posterior_rank_probs(icl_fit_re)
+
+# Plot the rankogram
+p_rank <- plot(icl_probs_re);p_rank
+
+# Save the rankogram
+rankogram_path <- file.path("")
+ggsave(rankogram_path, plot = p_rank, width = 12, height = 10, dpi = 100)
+
